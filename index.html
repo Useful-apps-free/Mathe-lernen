@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mathe-Trainer</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #eef5ff; /* Heller Blauton */
+        }
+        #app-wrapper {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        /* Hauptbereich für die Aufgaben */
+        #task-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+        #top-ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            box-sizing: border-box;
+        }
+        #progress-display {
+            font-size: 24px;
+            font-weight: 600;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 8px 18px;
+            border-radius: 20px;
+            color: #333;
+        }
+        #overall-timer {
+            font-size: 24px;
+            font-weight: 600;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 8px 18px;
+            border-radius: 20px;
+            color: #333;
+        }
+        #task-display {
+            font-size: 18vw; /* Große Schrift für die Aufgabe */
+            font-weight: bold;
+            color: #0d47a1; /* Dunkelblau */
+            margin-bottom: 20px;
+        }
+        #input-display {
+            font-size: 15vw;
+            font-weight: 500;
+            color: #555;
+            min-height: 1.2em;
+            border-bottom: 4px solid #ccc;
+            padding: 0 20px;
+        }
+        #input-display.wrong {
+            color: #d32f2f;
+            border-bottom-color: #d32f2f;
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* Numpad an der rechten Seite */
+        #numpad-container {
+            width: 300px; /* Feste Breite für das Numpad */
+            height: 100%;
+            background-color: #d7e4f5;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 8px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .numpad-btn {
+            background-color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 36px;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .numpad-btn:active {
+            background-color: #f0f0f0;
+            transform: scale(0.95);
+        }
+        #btn-enter {
+            background-color: #4CAF50; /* Grün */
+            color: white;
+        }
+        #btn-clear {
+            background-color: #f44336; /* Rot */
+            color: white;
+        }
+        /* Anpassungen für kleinere Bildschirme im Hochformat */
+        @media (orientation: portrait) {
+            #app-wrapper { flex-direction: column; }
+            #numpad-container { width: 100%; height: 40vh; }
+            #task-display { font-size: 25vw; }
+            #input-display { font-size: 20vw; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app-wrapper">
+        <div id="task-container">
+            <div id="top-ui-panel">
+                <div id="progress-display">0 / 30</div>
+                <div id="overall-timer">1h 0min 0s</div>
+            </div>
+            <div id="task-display">12 × 3</div>
+            <div id="input-display"></div>
+        </div>
+        <div id="numpad-container">
+            <button class="numpad-btn" data-value="7">7</button>
+            <button class="numpad-btn" data-value="8">8</button>
+            <button class="numpad-btn" data-value="9">9</button>
+            <button class="numpad-btn" data-value="4">4</button>
+            <button class="numpad-btn" data-value="5">5</button>
+            <button class="numpad-btn" data-value="6">6</button>
+            <button class="numpad-btn" data-value="1">1</button>
+            <button class="numpad-btn" data-value="2">2</button>
+            <button class="numpad-btn" data-value="3">3</button>
+            <button class="numpad-btn" id="btn-clear" data-value="clear">C</button>
+            <button class="numpad-btn" data-value="0">0</button>
+            <button class="numpad-btn" id="btn-enter" data-value="enter">↵</button>
+        </div>
+    </div>
+
+    <script>
+        const TOTAL_TASKS = 30;
+        const INITIAL_TIME_SECONDS = 3600; // 1 Stunde
+
+        let tasks = [];
+        let currentTaskIndex = 0;
+        let currentUserInput = '';
+        let timerInterval;
+        let remainingSeconds = INITIAL_TIME_SECONDS;
+
+        const taskDisplay = document.getElementById('task-display');
+        const inputDisplay = document.getElementById('input-display');
+        const progressDisplay = document.getElementById('progress-display');
+        const timerDisplay = document.getElementById('overall-timer');
+        const numpadContainer = document.getElementById('numpad-container');
+
+        // --- FUNKTIONEN ---
+
+        function generateTasks() {
+            const generatedTasks = [];
+            const usedTasks = new Set();
+
+            while (generatedTasks.length < TOTAL_TASKS) {
+                const num1 = Math.random() < 0.5 ? generateTwoDigit() : generateOneDigit();
+                const num2 = num1 > 9 ? generateOneDigit() : generateTwoDigit();
+                
+                const taskString = `${num1} × ${num2}`;
+                const taskKey = [num1, num2].sort().join(','); // Sorgt dafür, dass 12x4 und 4x12 als dieselbe Aufgabe gelten
+
+                if (!usedTasks.has(taskKey)) {
+                    generatedTasks.push({
+                        text: taskString,
+                        answer: num1 * num2
+                    });
+                    usedTasks.add(taskKey);
+                }
+            }
+            return generatedTasks;
+        }
+
+        function generateOneDigit() {
+            // Generiert eine Zahl von 2 bis 9
+            return Math.floor(Math.random() * 8) + 2;
+        }
+
+        function generateTwoDigit() {
+            // Generiert eine Zahl von 11 bis 99 (außer 10er)
+            let num;
+            do {
+                num = Math.floor(Math.random() * 89) + 11;
+            } while (num % 10 === 0);
+            return num;
+        }
+
+        function showNextTask() {
+            if (currentTaskIndex >= tasks.length) {
+                endTest();
+                return;
+            }
+            const task = tasks[currentTaskIndex];
+            taskDisplay.textContent = task.text;
+            currentUserInput = '';
+            inputDisplay.textContent = '';
+            updateProgressDisplay();
+        }
+
+        function updateProgressDisplay() {
+            progressDisplay.textContent = `${currentTaskIndex} / ${TOTAL_TASKS}`;
+        }
+        
+        function handleNumpadInput(value) {
+            if (value === 'enter') {
+                checkAnswer();
+            } else if (value === 'clear') {
+                currentUserInput = '';
+                inputDisplay.textContent = '';
+            } else if (currentUserInput.length < 5) { // Max 5 Ziffern
+                currentUserInput += value;
+                inputDisplay.textContent = currentUserInput;
+            }
+        }
+
+        function checkAnswer() {
+            if (currentUserInput === '') return;
+            const userAnswer = parseInt(currentUserInput, 10);
+            
+            if (userAnswer === tasks[currentTaskIndex].answer) {
+                // Richtig
+                currentTaskIndex++;
+                showNextTask();
+            } else {
+                // Falsch
+                inputDisplay.classList.add('wrong');
+                setTimeout(() => {
+                    inputDisplay.classList.remove('wrong');
+                    currentUserInput = '';
+                    inputDisplay.textContent = '';
+                }, 500);
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (remainingSeconds > 0) {
+                    remainingSeconds--;
+                    updateTimerDisplay();
+                } else {
+                    endTest();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const h = Math.floor(remainingSeconds / 3600);
+            const m = Math.floor((remainingSeconds % 3600) / 60);
+            const s = remainingSeconds % 60;
+            timerDisplay.textContent = `${h}h ${m}min ${s}s`;
+        }
+        
+        function endTest() {
+            clearInterval(timerInterval);
+            taskDisplay.textContent = 'Fertig!';
+            inputDisplay.textContent = '🎉';
+            numpadContainer.style.pointerEvents = 'none'; // Numpad deaktivieren
+            progressDisplay.textContent = `${TOTAL_TASKS} / ${TOTAL_TASKS}`;
+        }
+
+        function startApp() {
+            tasks = generateTasks();
+            currentTaskIndex = 0;
+            showNextTask();
+            startTimer();
+        }
+
+        // --- EVENT LISTENERS ---
+        numpadContainer.addEventListener('click', (event) => {
+            const target = event.target;
+            if (target.classList.contains('numpad-btn')) {
+                handleNumpadInput(target.dataset.value);
+            }
+        });
+        
+        startApp();
+    </script>
+</body>
+</html>

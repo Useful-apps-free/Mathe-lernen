@@ -1,0 +1,16 @@
+{
+  "name": "Mathe lernen",
+  "short_name": "Mathe",
+  "start_url": ".",
+  "display": "fullscreen",
+  "background_color": "#f0f8ff",
+  "theme_color": "#008CBA",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
